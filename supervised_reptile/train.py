@@ -66,7 +66,9 @@ def train(sess,
                                            num_classes=num_classes, num_shots=num_shots,
                                            inner_batch_size=eval_inner_batch_size,
                                            inner_iters=eval_inner_iters, replacement=replacement)
-                summary = sess.run(merged, feed_dict={accuracy_ph: correct/num_classes})
+                images, labels = dataset.get_batch()
+                feed_dict = {accuracy_ph: correct/num_classes, model.input_ph: images, model.label_ph: labels}
+                summary = sess.run(merged, feed_dict)
                 writer.add_summary(summary, i)
                 writer.flush()
                 accuracies.append(correct / num_classes)

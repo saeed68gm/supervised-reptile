@@ -62,9 +62,13 @@ class Reptile:
         old_vars = self._model_state.export_variables()
         new_vars = []
         for _ in range(meta_batch_size):
-            mini_dataset = _sample_mini_dataset(dataset, num_classes, num_shots)
-            for batch in _mini_batches(mini_dataset, inner_batch_size, inner_iters, replacement):
-                inputs, labels = zip(*batch)
+#            mini_dataset = _sample_mini_dataset(dataset, num_classes, num_shots)
+#            for batch in _mini_batches(mini_dataset, inner_batch_size, inner_iters, replacement):
+#                inputs, labels = zip(*batch)
+            print(dataset.num_batches)
+            for batch in range(dataset.num_batches):
+                inputs, labels = dataset.get_batch()
+                print("batch #{} input shape : {}".format(batch, inputs.shape))
                 if self._pre_step_op:
                     self.session.run(self._pre_step_op)
                 self.session.run(minimize_op, feed_dict={input_ph: inputs, label_ph: labels})
@@ -109,27 +113,41 @@ class Reptile:
           The number of correctly predicted samples.
             This always ranges from 0 to num_classes.
         """
-        train_set, test_set = _split_train_test(
-            _sample_mini_dataset(dataset, num_classes, num_shots+1))
+#        train_set, test_set = _split_train_test(
+#            _sample_mini_dataset(dataset, num_classes, num_shots+1))
+        sampled_dataset = (dataset.sample(num_shots + 1))
+        train_set, test_set = sampled_dataset.split()
         old_vars = self._full_state.export_variables()
-        for batch in _mini_batches(train_set, inner_batch_size, inner_iters, replacement):
-            inputs, labels = zip(*batch)
+#        for batch in _mini_batches(train_set, inner_batch_size, inner_iters, replacement):
+#            inputs, labels = zip(*batch)
+        print(dataset.num_batches)
+        for batch in range(dataset.num_batches):
+            inputs, labels = dataset.get_batch()
+            print("batch #{} input shape : {}".format(batch, inputs.shape))
             if self._pre_step_op:
                 self.session.run(self._pre_step_op)
             self.session.run(minimize_op, feed_dict={input_ph: inputs, label_ph: labels})
         test_preds = self._test_predictions(train_set, test_set, input_ph, predictions)
-        num_correct = sum([pred == sample[1] for pred, sample in zip(test_preds, test_set)])
+        #num_correct = sum([pred == sample[1] for pred, sample in zip(test_preds, test_set)])
+        images, labels = test_set.get_batch()
+        num_correct = sum([pred == labels for pred, sample in zip(test_preds, labels)])
+        print("num_correct : {}".format(num_correct))
         self._full_state.import_variables(old_vars)
         return num_correct
 
     def _test_predictions(self, train_set, test_set, input_ph, predictions):
         if self._transductive:
-            inputs, _ = zip(*test_set)
+            #inputs, _ = zip(*test_set)
+            inputs, _ = test_set.get_batch()
             return self.session.run(predictions, feed_dict={input_ph: inputs})
         res = []
-        for test_sample in test_set:
-            inputs, _ = zip(*train_set)
-            inputs += (test_sample[0],)
+        #for test_sample in test_set:
+            #inputs, _ = zip(*train_set)
+        for batch in range(test_set.num_batches):
+            inputs, _ = train_set.get_batch()
+            #inputs += (test_sample[0],)
+            test_inputs, _ = test_set.get_batch()
+            inputs = inputs + test_inputs
             res.append(self.session.run(predictions, feed_dict={input_ph: inputs})[-1])
         return res
 
